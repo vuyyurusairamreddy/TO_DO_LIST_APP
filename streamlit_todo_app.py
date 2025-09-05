@@ -173,8 +173,8 @@ for t in filtered:
         meta = f"[{t.get('category','uncategorized')}] • {t.get('priority','Medium')}"
         if t.get("due"):
             meta += f" • due {t.get('due')}"
-        st.markdown(f"**{title_display}**  
-{meta}")
+        st.markdown(f"""**{title_display}**  
+{meta}""")
         if t.get("description"):
             st.write(t.get("description"))
         a1, a2, a3 = st.columns([1,1,1])
