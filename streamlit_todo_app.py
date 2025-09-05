@@ -1,8 +1,3 @@
-"""
-Streamlit To-Do List App with Perplexity API (Sonar Pro model) support, updated for latest Streamlit
-File: streamlit_todo_app.py
-"""
-
 import streamlit as st
 from datetime import datetime, timezone
 import json
@@ -10,15 +5,19 @@ import os
 from pathlib import Path
 import requests
 from dotenv import load_dotenv
-import os
 
-load_dotenv() 
+# Load .env variables
+load_dotenv()
 
 # ---------- Session state setup ----------
 if "tasks" not in st.session_state:
     st.session_state.tasks = []
 if "refresh" not in st.session_state:
     st.session_state.refresh = False
+
+# ---------- Perplexity API setup ----------
+PERPLEXITY_API_KEY = os.environ.get("PERPLEXITY_API_KEY")
+USE_PERPLEXITY = PERPLEXITY_API_KEY is not None
 
 # ---------- Persistence helpers ----------
 DATA_FILE = Path("tasks.json")
@@ -37,9 +36,6 @@ def save_tasks(tasks):
         json.dump(tasks, f, ensure_ascii=False, indent=2)
 
 # ---------- Perplexity API helpers ----------
-PERPLEXITY_API_KEY = os.environ.get("PERPLEXITY_API_KEY")
-USE_PERPLEXITY = PERPLEXITY_API_KEY is not None
-
 def perplexity_chat(prompt: str, max_tokens: int = 100, temperature: float = 0.3) -> str:
     url = "https://api.perplexity.ai/chat/completions"
     headers = {
@@ -85,7 +81,7 @@ st.title("🗒️ Smart To-Do List")
 if not st.session_state.tasks:
     st.session_state.tasks = load_tasks()
 
-# Add new task form
+# ---------- Add Task Form ----------
 with st.form("add_task_form", clear_on_submit=False):
     st.subheader("Add a task")
     col1, col2 = st.columns([3,1])
@@ -97,25 +93,6 @@ with st.form("add_task_form", clear_on_submit=False):
         priority = st.selectbox("Priority", ["Medium","High","Low"]) 
         category = st.selectbox("Category", ["uncategorized","work","personal","shopping","errands","learning","other"]) 
     submitted = st.form_submit_button("Add task")
-
-    # AI buttons
-    if USE_PERPLEXITY:
-        ai_col1, ai_col2 = st.columns(2)
-        with ai_col1:
-            if st.button("Suggest title from description"):
-                if desc_input.strip():
-                    suggested = ai_suggest_title(desc_input.strip())
-                    if suggested:
-                        st.session_state.title_input = suggested
-                        st.session_state.refresh = not st.session_state.refresh
-                    else:
-                        st.info("Couldn't get suggestion.")
-        with ai_col2:
-            if st.button("Auto-categorize"):
-                if title_input.strip() or desc_input.strip():
-                    cat = ai_categorize(title_input.strip(), desc_input.strip())
-                    if cat:
-                        st.info(f"AI suggests category: {cat}")
 
 if submitted:
     if not title_input.strip() and not desc_input.strip():
@@ -136,7 +113,26 @@ if submitted:
         st.success("Task added!")
         st.session_state.refresh = not st.session_state.refresh
 
-# Filters and view
+# ---------- AI Buttons (outside form) ----------
+if USE_PERPLEXITY:
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Suggest title from description"):
+            if desc_input.strip():
+                suggested = ai_suggest_title(desc_input.strip())
+                if suggested:
+                    st.session_state.title_input = suggested
+                    st.session_state.refresh = not st.session_state.refresh
+                else:
+                    st.info("Couldn't get suggestion.")
+    with col2:
+        if st.button("Auto-categorize"):
+            if title_input.strip() or desc_input.strip():
+                cat = ai_categorize(title_input.strip(), desc_input.strip())
+                if cat:
+                    st.info(f"AI suggests category: {cat}")
+
+# ---------- Filters and Display ----------
 st.markdown("---")
 filter_col1, filter_col2, filter_col3 = st.columns([2,2,2])
 with filter_col1:
@@ -146,7 +142,6 @@ with filter_col2:
 with filter_col3:
     sort_by = st.selectbox("Sort by", ["created","due","priority"])
 
-# Display tasks
 filtered = []
 for t in st.session_state.tasks:
     if not show_done and t.get("done"):
@@ -168,6 +163,7 @@ st.subheader(f"Tasks ({len(filtered)})")
 if not filtered:
     st.info("No tasks found.")
 
+# ---------- Task display and actions ----------
 for t in filtered:
     cols = st.columns([0.06, 0.94])
     with cols[0]:
@@ -177,8 +173,7 @@ for t in filtered:
         meta = f"[{t.get('category','uncategorized')}] • {t.get('priority','Medium')}"
         if t.get("due"):
             meta += f" • due {t.get('due')}"
-        st.markdown(f"""**{title_display}**  
-{meta}""")
+        st.markdown(f"**{title_display}**\n{meta}")
         if t.get("description"):
             st.write(t.get("description"))
         a1, a2, a3 = st.columns([1,1,1])
@@ -207,7 +202,7 @@ for t in filtered:
         save_tasks(st.session_state.tasks)
         st.session_state.refresh = not st.session_state.refresh
 
-# Edit task section (if needed)
+# ---------- Edit task form ----------
 if st.session_state.get('edit_id'):
     st.markdown("---")
     st.subheader("Edit task")
@@ -217,6 +212,7 @@ if st.session_state.get('edit_id'):
     edue = st.text_input("Due (YYYY-MM-DD)", value=st.session_state.get('edit_due',''), key='edue')
     epriority = st.selectbox("Priority", ["Medium","High","Low"], index=["Medium","High","Low"].index(st.session_state.get('edit_priority','Medium')))
     ecat = st.selectbox("Category", ["uncategorized","work","personal","shopping","errands","learning","other"], index=["uncategorized","work","personal","shopping","errands","learning","other"].index(st.session_state.get('edit_category','uncategorized')))
+    
     if st.button("Save changes"):
         for task in st.session_state.tasks:
             if task['id'] == eid:
@@ -228,23 +224,5 @@ if st.session_state.get('edit_id'):
         save_tasks(st.session_state.tasks)
         st.success("Saved")
         for k in ['edit_id','edit_title','edit_description','edit_due','edit_priority','edit_category']:
-            if k in st.session_state:
-                del st.session_state[k]
+            st.session_state.pop(k, None)
         st.session_state.refresh = not st.session_state.refresh
-    if st.button("Cancel"):
-        for k in ['edit_id','edit_title','edit_description','edit_due','edit_priority','edit_category']:
-            if k in st.session_state:
-                del st.session_state[k]
-        st.session_state.refresh = not st.session_state.refresh
-
-st.markdown("---")
-col_info1, col_info2 = st.columns(2)
-with col_info1:
-    st.caption("Data stored locally in tasks.json")
-with col_info2:
-    if USE_PERPLEXITY:
-        st.caption("AI features enabled via Perplexity (Sonar Pro)")
-    else:
-        st.caption("AI features disabled — set PERPLEXITY_API_KEY to enable optional smart features")
-
-# End of file
