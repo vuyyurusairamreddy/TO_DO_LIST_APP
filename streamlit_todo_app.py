@@ -9,6 +9,10 @@ import json
 import os
 from pathlib import Path
 import requests
+from dotenv import load_dotenv
+import os
+
+load_dotenv() 
 
 # ---------- Session state setup ----------
 if "tasks" not in st.session_state:
