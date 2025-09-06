@@ -14,6 +14,8 @@ if "tasks" not in st.session_state:
     st.session_state.tasks = []
 if "refresh" not in st.session_state:
     st.session_state.refresh = False
+if "ai_suggested_title" not in st.session_state:
+    st.session_state.ai_suggested_title = ""
 
 # ---------- Perplexity API setup ----------
 PERPLEXITY_API_KEY = os.environ.get("PERPLEXITY_API_KEY")
@@ -86,7 +88,11 @@ with st.form("add_task_form", clear_on_submit=False):
     st.subheader("Add a task")
     col1, col2 = st.columns([3,1])
     with col1:
-        title_input = st.text_input("Title", key="title_input")
+        title_input = st.text_input(
+            "Title",
+            value=st.session_state.get("ai_suggested_title", ""),
+            key="title_input"
+        )
         desc_input = st.text_area("Description", height=80, key="desc_input")
     with col2:
         due = st.date_input("Due date", value=None)
@@ -111,6 +117,8 @@ if submitted:
         st.session_state.tasks.append(task)
         save_tasks(st.session_state.tasks)
         st.success("Task added!")
+        # Reset AI suggestion after adding
+        st.session_state.ai_suggested_title = ""
         st.session_state.refresh = not st.session_state.refresh
 
 # ---------- AI Buttons (outside form) ----------
@@ -121,8 +129,8 @@ if USE_PERPLEXITY:
             if desc_input.strip():
                 suggested = ai_suggest_title(desc_input.strip())
                 if suggested:
-                    st.session_state.title_input = suggested
-                    st.session_state.refresh = not st.session_state.refresh
+                    st.session_state.ai_suggested_title = suggested
+                    st.info(f"AI suggested title: **{suggested}**")
                 else:
                     st.info("Couldn't get suggestion.")
     with col2:
